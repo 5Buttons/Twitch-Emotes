@@ -164,7 +164,7 @@ Emoticons_Settings={
   local normalisedString = str: gsub("[%z\1-\127\194-\244][\128-\191]*", tableAccents)
   return normalisedString
 end
-  
+
 
 --Minimap Button
 function Emoticons_OnEvent(self, event, ...)
@@ -217,12 +217,14 @@ function Emoticons_OnEvent(self, event, ...)
         end
     end
 end
-  function ItemTextPageText.SetText(self,msg,...)
-	if(Emoticons_Settings["MAIL"] and msg ~= nil) then
-	  msg = Emoticons_RunReplacement(msg);
-	end
-	ItemTextFrameSetText(self,msg,...);
-  end
+
+  local ItemTextPageTextSetText = ItemTextPageText.SetText;
+	function ItemTextPageText.SetText(self, msg, ...)
+    if(Emoticons_Settings["MAIL"] and msg ~= nil) then
+        msg = Emoticons_RunReplacement(msg);
+    end
+    ItemTextPageTextSetText(self, msg, ...);
+end
   
   local OpenMailBodyTextSetText = OpenMailBodyText.SetText;
   function OpenMailBodyText.SetText(self,msg,...)
@@ -284,8 +286,6 @@ end
 	sm(recipient,subject,msg,...);
   end
   
-  
-  
   local scm = SendChatMessage;
   function SendChatMessage(msg,...)
 	if(Emoticons_Eyecandy) then
@@ -302,8 +302,6 @@ end
 	bnsw(id,msg,...);
   end
 
-
-  
   function Emoticons_UpdateChatFilters()
 	for k,v in pairs(Emoticons_Settings) do
 	  if(k ~= "MAIL" and k ~= "TWITCHBUTTON" and k ~= "sliderX" and k ~= "sliderY") then
@@ -317,9 +315,7 @@ end
   end
   
   function Emoticons_MessageFilter(self, event, msg, ...)
-  
 	msg = Emoticons_RunReplacement(msg);
-  
 	return false, msg, ...
   end
   
@@ -331,54 +327,38 @@ end
 		cb:SetChecked(Emoticons_Settings[k]);
 	  end
 	end
-	--SliderXText:SetText("Position X: "..Emoticons_Settings["sliderX"]);
-	--SliderYText:SetText("Position Y: "..Emoticons_Settings["sliderY"]);
-	--EmoticonsOptionsControlsPanelEyecandy:SetChecked(Emoticons_Eyecandy);
-  
+
 	favall = CreateFrame("CheckButton","favall_GlobalName",EmoticonsOptionsControlsPanel,"UIRadioButtonTemplate" );
-	--getglobal("favall_GlobalName"):SetChecked(false);
 	favall:SetPoint("TOPLEFT", 17,-230);
 	getglobal(favall:GetName().."Text"):SetText("Check all");
 	favall.tooltip = "Check all boxes below.";
 	getglobal("favall_GlobalName"):SetScript("OnClick",
 	function(self)
---	  if (self:GetChecked()) then
 		if (getglobal("favnone_GlobalName"):GetChecked() == true) then
 		  getglobal("favnone_GlobalName"):SetChecked(false);
 		end
 		self:SetChecked(true);
 		for n,m in ipairs(Emoticons_Settings["FAVEMOTES"]) do
 		  Emoticons_Settings["FAVEMOTES"][n] = true;
-		  --print("favCheckButton_"..dropdown_options[n][1]);
 		  getglobal("favCheckButton_"..dropdown_options[n][1]):SetChecked(true);
 		end
---	  else
-		--Emoticons_Settings["FAVEMOTES"][a] = false;
---	  end
 	end
 	);
   
 	favnone = CreateFrame("CheckButton", "favnone_GlobalName", favall_GlobalName,"UIRadioButtonTemplate" );
-	--getglobal("favnone_GlobalName"):SetChecked(false);
 	favnone:SetPoint("TOPLEFT", 110,0);
 	getglobal(favnone:GetName().."Text"):SetText("Uncheck all");
 	favnone.tooltip = "Uncheck all boxes below.";
 	getglobal("favnone_GlobalName"):SetScript("OnClick",
 	function(self)
-	  -- Critical fix: Remove self-checking condition which was preventing visual update
-	  -- if (self:GetChecked()) then
 	  if (getglobal("favall_GlobalName"):GetChecked() == true) then
 		getglobal("favall_GlobalName"):SetChecked(false);
 	  end
 	  self:SetChecked(true);
 	  for n,m in ipairs(Emoticons_Settings["FAVEMOTES"]) do
 		Emoticons_Settings["FAVEMOTES"][n] = false;
-		-- Directly set the visual state without checking current state
 		getglobal("favCheckButton_"..dropdown_options[n][1]):SetChecked(false);
 	  end
-	  -- else
-	  --   --Emoticons_Settings["FAVEMOTES"][a] = false;
-	  -- end
 	end
 	);
   
@@ -397,8 +377,6 @@ end
 		first=false;
 		favCheckButton:SetPoint("TOPLEFT", 0, 3);
 	  else
-		--favbuttonlist=loadstring("favCheckButton_"..anchor);
-  
 		favCheckButton = CreateFrame("CheckButton", "favCheckButton_"..c[1], favframe_GlobalName, "ChatConfigCheckButtonTemplate");
 		favCheckButton:SetParent("favCheckButton_"..anchor);
 		if ((itemcnt % 10) ~= 0) then
@@ -409,8 +387,6 @@ end
 	  end
 	  itemcnt=itemcnt+1;
 	  anchor=c[1];
-  
-	  --code=[[print("favCheckButton_"..b[1]..":SetText(b[1])")]];
   
 	  getglobal(favCheckButton:GetName().."Text"):SetText(c[1]);
 	  if (getglobal("favCheckButton_"..c[1]):GetChecked() ~= Emoticons_Settings["FAVEMOTES"][a]) then
@@ -437,9 +413,6 @@ end
   end
   
   function Emoticons_RunReplacement(msg)
-  
-	--remember to watch out for |H|h|h's
-  
 	local outstr = "";
 	local origlen = string.len(msg);
 	local startpos = 1;
@@ -451,7 +424,7 @@ end
 	  if(pos ~= nil) then
 		endpos = pos;
 	  end
-	  outstr = outstr .. Emoticons_InsertEmoticons(string.sub(msg,startpos,endpos)); --run replacement on this bit
+	  outstr = outstr .. Emoticons_InsertEmoticons(string.sub(msg,startpos,endpos));
 	  startpos = endpos + 1;
 	  if(pos ~= nil) then
 		endpos = string.find(msg,"|h",startpos,true);
@@ -459,7 +432,7 @@ end
 		  endpos = origlen;
 		end
 		if(startpos < endpos) then
-		  outstr = outstr .. string.sub(msg,startpos,endpos); --don't run replacement on this bit
+		  outstr = outstr .. string.sub(msg,startpos,endpos);
 		  startpos = endpos + 1;
 		end
 	  end
@@ -498,9 +471,7 @@ end
     end
 end
   
-  
   function Emoticons_InsertEmoticons(msg)
-  	--print(table.getn(words)) ;
 	for k,v in pairs(emoticons) do
 	  if (string.find(msg,k,1,true)) then
 		msg = string.gsub(msg,"(%s)"..k.."(%s)","%1|T"..defaultpack[v].."|t%2");
@@ -511,7 +482,6 @@ end
 		msg = string.gsub(msg,"(%s)"..k.."(%s)","%1|T"..defaultpack[v].."|t%2");
 	  end
 	end
-
 	return msg;
   end
   
@@ -535,11 +505,93 @@ end
 	if(chattype == "CHAT_MSG_BATTLEGROUND") then
 	  Emoticons_Settings["CHAT_MSG_BATTLEGROUND_LEADER"] = state;
 	end
---	if(chattype == "CHAT_MSG_BN_WHISPER") then
---	  Emoticons_Settings["CHAT_MSG_BN_WHISPER_INFORM"] = state;
---	end
-  
 	Emoticons_Settings[chattype] = state;
 	Emoticons_UpdateChatFilters();
   end
-  
+
+-- Chat Bubble Emoticon Processing
+local EmoticonBubbles = {}
+
+function EmoticonBubbles:Setup()
+    -- Get the FontString metatable
+    local fs = CreateFrame("Frame"):CreateFontString()
+    local mt = getmetatable(fs).__index
+    local origSetText = mt.SetText
+
+    mt.SetText = function(self, text, ...)
+        if text and self:GetParent() and self:GetParent():GetParent() == WorldFrame then
+            local newText = text
+            local prev
+            repeat
+                prev = newText
+                newText = Emoticons_RunReplacement(newText)
+            until newText == prev
+            return origSetText(self, newText, ...)
+        end
+        return origSetText(self, text, ...)
+    end
+end
+
+-- Also keep a polling fallback for bubbles already visible
+function EmoticonBubbles:ProcessBubbles()
+    for i = 1, WorldFrame:GetNumChildren() do
+        local frame = select(i, WorldFrame:GetChildren())
+        if frame and frame:IsVisible() then
+            -- Try children first
+            if frame:GetNumChildren() > 0 then
+                local fontString = frame:GetChildren()
+                if fontString and fontString:GetObjectType() == "FontString" then
+                    local text = fontString:GetText()
+                    if text and text ~= "" and text ~= fontString.lastText then
+                        local newText = text
+                        local prev
+                        repeat
+                            prev = newText
+                            newText = Emoticons_RunReplacement(newText)
+                        until newText == prev
+                        if newText ~= text then
+                            fontString:SetText(newText)
+                        end
+                        fontString.lastText = text
+                    end
+                end
+            end
+            -- Try regions as fallback
+            if frame:GetNumRegions() > 0 then
+                for j = 1, frame:GetNumRegions() do
+                    local region = select(j, frame:GetRegions())
+                    if region and region:GetObjectType() == "FontString" then
+                        local text = region:GetText()
+                        if text and text ~= "" and text ~= region.lastText then
+                            local newText = text
+                            local prev
+                            repeat
+                                prev = newText
+                                newText = Emoticons_RunReplacement(newText)
+                            until newText == prev
+                            if newText ~= text then
+                                region:SetText(newText)
+                            end
+                            region.lastText = text
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local bubbleFrame = CreateFrame("Frame")
+bubbleFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+bubbleFrame:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_ENTERING_WORLD" then
+        EmoticonBubbles:Setup()
+        self:SetScript("OnUpdate", function(self, elapsed)
+            self.throttle = (self.throttle or 0.1) - elapsed
+            if self.throttle < 0 then
+                self.throttle = 0.1
+                EmoticonBubbles:ProcessBubbles()
+            end
+        end)
+    end
+end)
