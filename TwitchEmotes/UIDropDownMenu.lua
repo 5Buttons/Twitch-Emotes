@@ -14,10 +14,9 @@ LIB_OPEN_DROPDOWNMENUS = {}
 -- Cache frequently used global functions for performance
 local _G = _G
 local CreateFrame = CreateFrame
-local wipe = table.wipe
+local wipe = wipe
 local max = math.max
 local strmatch = string.match
-local gsub = string.gsub
 local pairs = pairs
 local type = type
 local GetCursorPosition = GetCursorPosition
@@ -534,7 +533,7 @@ function Lib_UIDropDownMenu_Refresh(frame, useValue, dropdownLevel)
     
     frame.lastRefreshTime = GetTime()
     
-    local button, checked, checkImage, uncheckImage, normalText
+    local button, checked, checkImage, uncheckImage, normalText, width
     local maxWidth = 0
     local somethingChecked = nil
     
@@ -611,7 +610,7 @@ function Lib_UIDropDownMenu_Refresh(frame, useValue, dropdownLevel)
     end
 
     if somethingChecked == nil then
-        Lib_UIDropDownMenu_SetText(frame, VIDEO_QUALITY_LABEL6)
+        Lib_UIDropDownMenu_SetText(frame, NONE or "None")
     end
 
     if not frame.noResize and maxWidth > 0 then
@@ -725,49 +724,6 @@ function Lib_UIDropDownMenu_GetSelectedID(frame)
             end
         end
     end
-end
-
-function Lib_UIDropDownMenuButton_OnClick(self)
-    local checkName = self:GetName().."Check";
-    local uncheckName = self:GetName().."UnCheck";
-    local checked = self.checked;
-    
-    if type(checked) == "function" then
-        checked = checked(self);
-    end
-    
-    if self.keepShownOnClick then
-        if not self.notCheckable then
-            if checked then
-                _G[checkName]:Hide();
-                _G[uncheckName]:Show();
-                checked = false;
-            else
-                _G[checkName]:Show();
-                _G[uncheckName]:Hide();
-                checked = true;
-            end
-        end
-    else
-        self:GetParent():Hide();
-    end
-    
-    if type(self.checked) ~= "function" then
-        self.checked = checked;
-    end
-    
-    local func = self.func;
-    if func then
-        func(self, self.arg1, self.arg2, checked);
-    end
-    
-    if not self.noClickSound then
-        PlaySound("UChatScrollButton");
-    end
-end
-
-function Lib_HideDropDownMenu(level)
-    _G["Lib_DropDownList"..level]:Hide();
 end
 
 function Lib_ToggleDropDownMenu(level, value, dropDownFrame, anchorName, xOffset, yOffset, menuList, button, autoHideDelay)
@@ -909,39 +865,38 @@ function Lib_ToggleDropDownMenu(level, value, dropDownFrame, anchorName, xOffset
         listFrame:ClearAllPoints();
         listFrame:SetPoint(point, relativeTo, relativePoint, xOffset + xAddOffset, yOffset + yAddOffset);
     else
-        local offscreenY = (y - listFrame:GetHeight()/2) < 0;
-        local offscreenX = listFrame:GetRight() > GetScreenWidth();
-        local offscreenBottomY = (listFrame:GetBottom() < 0);
-        
-        if offscreenY and offscreenX then
-            point = gsub(point, "TOP(.*)", "BOTTOM%1");
-            point = gsub(point, "(.*)LEFT", "%1RIGHT");
-            relativePoint = gsub(relativePoint, "TOP(.*)", "BOTTOM%1");
-            relativePoint = gsub(relativePoint, "(.*)RIGHT", "%1LEFT");
+        local screenW = GetScreenWidth();
+        local screenH = GetScreenHeight();
+        local openLeft  = listFrame:GetRight() > screenW;
+        local openUp    = listFrame:GetBottom() < 0;
+
+        -- Safety check: if opening upward would go off the top, prefer down anyway
+        if openUp and listFrame:GetTop() + listFrame:GetHeight() > screenH then
+            openUp = false;
+        end
+
+        if openLeft and openUp then
+            point = "BOTTOMRIGHT";
+            relativePoint = "BOTTOMLEFT";
             xOffset = -11;
-            yOffset = -14;
-        elseif offscreenBottomY then
+            yOffset = 0;
+        elseif openLeft then
+            point = "TOPRIGHT";
+            relativePoint = "TOPLEFT";
+            xOffset = -11;
+            yOffset = 0;
+        elseif openUp then
             point = "BOTTOMLEFT";
             relativePoint = "BOTTOMRIGHT";
             xOffset = 0;
-            yOffset = 14;
-        elseif offscreenY then
-            point = gsub(point, "TOP(.*)", "BOTTOM%1");
-            relativePoint = gsub(relativePoint, "TOP(.*)", "BOTTOM%1");
-            xOffset = 0;
-            yOffset = -14;
-        elseif offscreenX then
-            point = gsub(point, "(.*)LEFT", "%1RIGHT");
-            relativePoint = gsub(relativePoint, "(.*)RIGHT", "%1LEFT");
-            xOffset = -11;
-            yOffset = 14;
+            yOffset = 0;
         else
             point = "TOPLEFT";
             relativePoint = "TOPRIGHT";
             xOffset = 0;
             yOffset = 0;
         end
-        
+
         listFrame:ClearAllPoints();
         listFrame.parentLevel = tonumber(strmatch(anchorFrame:GetName(), "Lib_DropDownList(%d+)"));
         listFrame.parentID = anchorFrame:GetID();
@@ -1131,7 +1086,7 @@ function Lib_UIDropDownMenu_IsEnabled(dropDown)
 end
 
 function Lib_UIDropDownMenu_GetValue(id)
-    local button = _G["DropDownList1Button"..id];
+    local button = _G["Lib_DropDownList1Button"..id];
     if button then
         return button.value;
     end
