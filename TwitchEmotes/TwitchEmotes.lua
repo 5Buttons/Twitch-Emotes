@@ -212,11 +212,10 @@ function Emoticons_OnEvent(self, event, ...)
                 GameTooltip:Hide()
             end
         })
-        if not Emoticons_Settings["MINIMAPBUTTON"] then
-            LDBIcon:Hide("TwitchEmotesIcon")
-        else
-            LDBIcon:Show("TwitchEmotesIcon")
-        end
+        Emoticons_Settings.hide = not Emoticons_Settings["MINIMAPBUTTON"]
+        LDBIcon:Register("TwitchEmotesIcon", TwitchEmotesLDB, Emoticons_Settings)
+
+        -- Register Ace settings panel
         local AceConfig = LibStub("AceConfig-3.0")
         local AceConfigDialog = LibStub("AceConfigDialog-3.0")
         AceConfig:RegisterOptionsTable("TwitchEmotes", BuildOptionsTable())
@@ -272,16 +271,13 @@ end
 		  Lib_UIDropDownMenu_AddButton(info, level);
 		end
 	  end
-  
 	end
   end
-  
   function Emoticons_Dropdown_OnClick(self,arg1,arg2,arg3)
 	if(ACTIVE_CHAT_EDIT_BOX ~= nil) then
 	  ACTIVE_CHAT_EDIT_BOX:Insert(self.value);
 	end
   end
-  
   function Emoticons_MailFrame_OnChar(self)
 	local msg = self:GetText();
 	if(Emoticons_Eyecandy and Emoticons_Settings["MAIL"] and string.sub(msg,1,1) ~= "/") then
