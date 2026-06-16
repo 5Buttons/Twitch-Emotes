@@ -4,7 +4,7 @@
 ## Notes: Adds popular Twitch & Discord emotes to your chat. Developed by Ren - 3.3.5a backport by Fivebuttons 
 ## Author: Ren
 ## Version: v2
-## SavedVariables: Emoticons_Settings Emoticons_Eyecandy
+## SavedVariables: Emoticons_Settings Emoticons_Eyecandy TwitchEmoteStatistics
 ## OptionalDeps: LibStub
 
 # Libraries
@@ -14,7 +14,10 @@ Libs\libdatabroker-1-1\LibDataBroker-1.1.lua
 
 Libs\AceAddon-3.0\AceAddon-3.0.xml
 Libs\AceEvent-3.0\AceEvent-3.0.xml
-Libs\AceDB-3.0\AceDB-3.0.xml     
+Libs\AceDB-3.0\AceDB-3.0.xml
+Libs\AceHook-3.0\AceHook-3.0.xml
+Libs\AceGUI-3.0\AceGUI-3.0.xml
+Libs\AceConfig-3.0\AceConfig-3.0.xml
 
 Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
@@ -22,4 +25,5 @@ Emotes.lua
 UIDropDownMenuTemplates.xml
 UIDropDownMenu.lua
 TwitchEmotes.lua
-TwitchEmotes.xml
+TwitchEmotesAutoComplete.lua
+TwitchEmotesStats.lua

@@ -26,13 +26,15 @@ Emoticons_Settings={
 	["sliderY"]=0,
 	["MinimapPos"] = 45,
 	["MINIMAPBUTTON"] = true,
+	["BUBBLEEMOTES"] = true,
+	["AUTOCOMPLETE"] = true,
+	["CLICKABLEEMOTES"] = true,
 	["FAVEMOTES"] = {true,true,true,true,true,true,true,true,true,true,
 	true,true,true,true,true,true,true,true,true,true,
 	true,true,true,true,true,true,true,true,}
-  
+
   };
   Emoticons_Eyecandy = false;
-  
   local origsettings = {
 	["CHAT_MSG_OFFICER"]=true,
 	["CHAT_MSG_GUILD"]=true,
@@ -57,13 +59,14 @@ Emoticons_Settings={
 	["sliderY"]=0,
 	["MinimapPos"] = 45,
 	["MINIMAPBUTTON"] = true,
+	["BUBBLEEMOTES"] = true,
+	["AUTOCOMPLETE"] = true,
+	["CLICKABLEEMOTES"] = true,
 	["FAVEMOTES"] = {true,true,true,true,true,true,true,true,true,true,
 	true,true,true,true,true,true,true,true,true,true,
 	true,true,true,true,true,true,true,true,}
   };
-  
   local dropdown_options={
-  
 	[01]=  {"Asmongold","asmon1","asmon2","asmon3","asmon4","asmonC","asmonCD","asmonD","asmonDad","asmonDaze","asmonDegen","asmonE","asmonE1","asmonE2","asmonE3","asmonE4","asmonFiend","asmonG","asmonGASM","asmonGet","asmonHide","asmonL","asmonLFR","asmonLove","asmonLong1","asmonLong2","asmonLong3","asmonLong4","asmonM","asmonOcean","asmonOrc","asmonTar","asmonP","asmonPower","asmonPray","asmonPrime","asmonR","asmonREE","asmonSad","asmonStare","asmonTiger","asmonUH","asmonW","asmonWHAT","asmonWHATR","asmonWOW"},
 	[02]=  {"Preachlfw","pgeBan","pgeBen","pgeBrian","pgeCheese","pgeChick","pgeClub","pgeCrisp","pgeDrama","pgeEdge","pgeEmma","pgeFish","pgeGhost","pgeHmm","pgeNem","pgeNoob","pgeOhno","pgeOhno2","pgePog","pgePug","pgeRay","pgeScience","pgeShame","pgeSherry"},
 	[03]=  {"BTTV+FFZ 1","tooDank","4Head","ANELE","AngelThump","BibleThump","bUrself","BBona","BabyRage","BlessRNG","BloodTrail","ConcernDoge","DogeWitIt","ConcernFroge","cmonBrother","cmonBruh","cmonBrug","HYPERBRUG","WTFF","DansGame","DatSheffy","D:","DD:","FacePalm","EleGiggle","eShrug","FailFish","FrankerZ","GabeN","gachiGASM","gachiHYPER","HandsUp","GivePLZ","TakeNRG","haHAA","HeyGuys","HotPokket","HYPERLUL","LUL","LULW","MegaLUL","MingLUL","MingLee","Jebaited","KKomrade"},
@@ -94,8 +97,6 @@ Emoticons_Settings={
 	[28]=  {"Chromie", "Dedge", "CavemanBob","CcKekThas", "CcMile", "GusFring"},
 };
 
-  -- Call this in a mod's initialization to move the minimap button to its saved position (also used in its movement)
-  -- ** do not call from the mod's OnLoad, VARIABLES_LOADED or later is fine. **
   function stripChars(str)
   local tableAccents = {}
     tableAccents["À"] = "A"
@@ -166,6 +167,9 @@ Emoticons_Settings={
 end
 
 
+local BuildOptionsTable, BuildFavOptionsTable  -- forward declarations; assigned below
+local favBlizPanel  -- set after AddToBlizOptions, used by the navigate button
+
 --Minimap Button
 function Emoticons_OnEvent(self, event, ...)
     if (event == "ADDON_LOADED" and select(1, ...) == "TwitchEmotes") then
@@ -187,36 +191,44 @@ function Emoticons_OnEvent(self, event, ...)
             type = "launcher", 
             icon = "Interface\\AddOns\\TwitchEmotes\\Emotes\\1337.tga",
             tooltip = "Twitch Emotes",
-            OnClick = function(frame, button) 
-                if button == "LeftButton" then
-                    Lib_ToggleDropDownMenu(1, nil, EmoticonChatFrameDropDown, frame, 0, 0);
+            OnClick = function(frame, button)
+                if IsShiftKeyDown() then
+                    TwitchStats_Toggle()
+                elseif button == "LeftButton" then
+                    Lib_ToggleDropDownMenu(1, nil, EmoticonChatFrameDropDown, frame, 0, 0)
                 elseif button == "RightButton" then
-                    InterfaceOptionsFrame_OpenToCategory(EmoticonsOptionsControlsPanel)
+                    InterfaceOptionsFrame_OpenToCategory("TwitchEmotes")
                 end
             end,
             OnEnter = function(frame)
                 GameTooltip:SetOwner(frame, "ANCHOR_BOTTOMLEFT")
                 GameTooltip:AddLine("Twitch Emotes")
                 GameTooltip:AddLine("|cffeda55fClick:|r Show Emotes")
-                GameTooltip:AddLine("|cffeda55fRight-Click:|r Options") 
+                GameTooltip:AddLine("|cffeda55fShift-Click:|r Emote Statistics")
+                GameTooltip:AddLine("|cffeda55fRight-Click:|r Options")
                 GameTooltip:Show()
             end,
             OnLeave = function(frame)
                 GameTooltip:Hide()
             end
         })
-        
-        -- Then register with LibDBIcon, using Emoticons_Settings as the db
-        LDBIcon:Register("TwitchEmotesIcon", TwitchEmotesLDB, Emoticons_Settings)
-        
-        -- Update visibility based on settings
         if not Emoticons_Settings["MINIMAPBUTTON"] then
             LDBIcon:Hide("TwitchEmotesIcon")
         else
             LDBIcon:Show("TwitchEmotesIcon")
         end
+        local AceConfig = LibStub("AceConfig-3.0")
+        local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+        AceConfig:RegisterOptionsTable("TwitchEmotes", BuildOptionsTable())
+        AceConfig:RegisterOptionsTable("TwitchEmotesFavs", BuildFavOptionsTable())
+        AceConfigDialog:AddToBlizOptions("TwitchEmotes", "TwitchEmotes")
+        favBlizPanel = AceConfigDialog:AddToBlizOptions("TwitchEmotesFavs", "Favourites", "TwitchEmotes")
     end
 end
+
+local addonFrame = CreateFrame("Frame")
+addonFrame:RegisterEvent("ADDON_LOADED")
+addonFrame:SetScript("OnEvent", Emoticons_OnEvent)
 
   local ItemTextPageTextSetText = ItemTextPageText.SetText;
 	function ItemTextPageText.SetText(self, msg, ...)
@@ -248,12 +260,11 @@ end
 		end
 	  end
 	else
-	  first=true;
+	  local first=true;
 	  for ke,va in ipairs(dropdown_options[menuList]) do
 		if (first) then
 		  first = false;
 		else
-		  --print(ke.." "..va);
 		  info.text       = "|T"..defaultpack[va].."|t "..va;
 		  info.value      = va;
 		  info.func = Emoticons_Dropdown_OnClick;
@@ -294,17 +305,9 @@ end
 	scm(msg,...);
   end
   
-  local bnsw = BNSendWhisper;
-  function BNSendWhisper(id,msg,...)
-	if(Emoticons_Eyecandy) then
-	  msg = Emoticons_Deformat(msg);
-	end
-	bnsw(id,msg,...);
-  end
-
   function Emoticons_UpdateChatFilters()
 	for k,v in pairs(Emoticons_Settings) do
-	  if(k ~= "MAIL" and k ~= "TWITCHBUTTON" and k ~= "sliderX" and k ~= "sliderY") then
+	  if(type(k) == "string" and string.find(k, "^CHAT_MSG_")) then
 		if(v) then
 		  ChatFrame_AddMessageEventFilter(k,Emoticons_MessageFilter)
 		else
@@ -319,95 +322,9 @@ end
 	return false, msg, ...
   end
   
-  function Emoticons_OptionsWindow_OnShow(self)
-	for k,v in pairs(Emoticons_Settings) do
-	  local cb = getglobal("EmoticonsOptionsControlsPanel"..k);
-  
-	  if(cb ~= nil) then
-		cb:SetChecked(Emoticons_Settings[k]);
-	  end
-	end
-
-	favall = CreateFrame("CheckButton","favall_GlobalName",EmoticonsOptionsControlsPanel,"UIRadioButtonTemplate" );
-	favall:SetPoint("TOPLEFT", 17,-230);
-	getglobal(favall:GetName().."Text"):SetText("Check all");
-	favall.tooltip = "Check all boxes below.";
-	getglobal("favall_GlobalName"):SetScript("OnClick",
-	function(self)
-		if (getglobal("favnone_GlobalName"):GetChecked() == true) then
-		  getglobal("favnone_GlobalName"):SetChecked(false);
-		end
-		self:SetChecked(true);
-		for n,m in ipairs(Emoticons_Settings["FAVEMOTES"]) do
-		  Emoticons_Settings["FAVEMOTES"][n] = true;
-		  getglobal("favCheckButton_"..dropdown_options[n][1]):SetChecked(true);
-		end
-	end
-	);
-  
-	favnone = CreateFrame("CheckButton", "favnone_GlobalName", favall_GlobalName,"UIRadioButtonTemplate" );
-	favnone:SetPoint("TOPLEFT", 110,0);
-	getglobal(favnone:GetName().."Text"):SetText("Uncheck all");
-	favnone.tooltip = "Uncheck all boxes below.";
-	getglobal("favnone_GlobalName"):SetScript("OnClick",
-	function(self)
-	  if (getglobal("favall_GlobalName"):GetChecked() == true) then
-		getglobal("favall_GlobalName"):SetChecked(false);
-	  end
-	  self:SetChecked(true);
-	  for n,m in ipairs(Emoticons_Settings["FAVEMOTES"]) do
-		Emoticons_Settings["FAVEMOTES"][n] = false;
-		getglobal("favCheckButton_"..dropdown_options[n][1]):SetChecked(false);
-	  end
-	end
-	);
-  
-	favframe = CreateFrame("Frame", "favframe_GlobalName", favall_GlobalName);
-	favframe:SetPoint("TOPLEFT", 0,-24);
-	favframe:SetSize(590,175);
-  
-	favframe:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground",edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",tile=true,tileSize=5,edgeSize= 2,});
-	favframe:SetBackdropColor(0, 0, 0,0.5);
-	first=true;
-	itemcnt=0
-	for a,c in ipairs(dropdown_options) do
-  
-	  if first then
-		favCheckButton = CreateFrame("CheckButton", "favCheckButton_"..c[1], favframe_GlobalName, "ChatConfigCheckButtonTemplate");
-		first=false;
-		favCheckButton:SetPoint("TOPLEFT", 0, 3);
-	  else
-		favCheckButton = CreateFrame("CheckButton", "favCheckButton_"..c[1], favframe_GlobalName, "ChatConfigCheckButtonTemplate");
-		favCheckButton:SetParent("favCheckButton_"..anchor);
-		if ((itemcnt % 10) ~= 0) then
-		  favCheckButton:SetPoint("TOPLEFT", 0, -16);
-		else
-		  favCheckButton:SetPoint("TOPLEFT", 110, 9*16);
-		end
-	  end
-	  itemcnt=itemcnt+1;
-	  anchor=c[1];
-  
-	  getglobal(favCheckButton:GetName().."Text"):SetText(c[1]);
-	  if (getglobal("favCheckButton_"..c[1]):GetChecked() ~= Emoticons_Settings["FAVEMOTES"][a]) then
-		getglobal("favCheckButton_"..c[1]):SetChecked(Emoticons_Settings["FAVEMOTES"][a]);
-	  end
-	  favCheckButton.tooltip = "Checked boxes will show in the dropdownlist.";
-	  favCheckButton:SetScript("OnClick",
-	  function(self)
-		if (self:GetChecked()) then
-		  Emoticons_Settings["FAVEMOTES"][a] = true;
-		else
-		  Emoticons_Settings["FAVEMOTES"][a] = false;
-		end
-	  end
-	  );
-	end
-  end
-  
   function Emoticons_Deformat(msg)
 	for k,v in pairs(emoticons) do
-	  msg=string.gsub(msg,"|T"..defaultpack[k].."%:28%:28|t",v);
+	  msg = string.gsub(msg, "|T"..defaultpack[k].."|t", v);
 	end
 	return msg;
   end
@@ -470,16 +387,26 @@ end
         print("TwitchEmotes Error: LibDBIcon not available when trying to set minimap button visibility.")
     end
 end
-  
+  local EMOTE_DELIMITERS = "%s,'<>?-%.!"
+
   function Emoticons_InsertEmoticons(msg)
-	for k,v in pairs(emoticons) do
-	  if (string.find(msg,k,1,true)) then
-		msg = string.gsub(msg,"(%s)"..k.."(%s)","%1|T"..defaultpack[v].."|t%2");
-		msg = string.gsub(msg,"(%s)"..k.."$","%1|T"..defaultpack[v].."|t");
-		msg = string.gsub(msg,"^"..k.."(%s)","|T"..defaultpack[v].."|t%1");
-		msg = string.gsub(msg,"^"..k.."$","|T"..defaultpack[v].."|t");
-		msg = string.gsub(msg,"(%s)"..k.."(%c)","%1|T"..defaultpack[v].."|t%2");
-		msg = string.gsub(msg,"(%s)"..k.."(%s)","%1|T"..defaultpack[v].."|t%2");
+	local wrapPattern = "([" .. EMOTE_DELIMITERS .. "]+)"
+	for word in string.gmatch(msg, "[^" .. EMOTE_DELIMITERS .. "]+") do
+	  local emote = emoticons[word]
+	  if (emote and defaultpack[emote]) then
+		local tex = defaultpack[emote]
+		local core
+		if (Emoticons_Settings["CLICKABLEEMOTES"]) then
+		  core = "|Htel:" .. word .. "|h|T" .. tex .. "|t|h"
+		else
+		  core = "|T" .. tex .. "|t"
+		end
+		msg = string.gsub(msg, wrapPattern .. word .. wrapPattern, "%1" .. core .. "%2", 1)
+		msg = string.gsub(msg, wrapPattern .. word .. "$",         "%1" .. core,         1)
+		msg = string.gsub(msg, "^" .. word .. wrapPattern,         core .. "%1",         1)
+		msg = string.gsub(msg, "^" .. word .. "$",                 core)
+		msg = string.gsub(msg, wrapPattern .. word .. "(%c)",      "%1" .. core .. "%2", 1)
+		msg = string.gsub(msg, wrapPattern .. word .. wrapPattern, "%1" .. core .. "%2", 1)
 	  end
 	end
 	return msg;
@@ -508,73 +435,187 @@ end
 	Emoticons_Settings[chattype] = state;
 	Emoticons_UpdateChatFilters();
   end
+local EmoticonChatFrameDropDown = CreateFrame("Frame", "EmoticonChatFrameDropDown", UIParent, "Lib_UIDropDownMenuTemplate")
+Lib_UIDropDownMenu_Initialize(EmoticonChatFrameDropDown, Emoticons_LoadChatFrameDropdown, "MENU", 1)
 
--- Chat Bubble Emoticon Processing
+-- ── AceConfig options tables ──────────────────────────────────────────────────
+
+BuildOptionsTable = function()
+    local opts = {
+        type = "group",
+        name = "TwitchEmotes",
+        args = {
+            channelsHeader = { type = "header", name = "Chat Channels", order = 1 },
+            say          = { type = "toggle", name = "Say",          order = 2,
+                get = function() return Emoticons_Settings["CHAT_MSG_SAY"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_SAY", v) end },
+            yell         = { type = "toggle", name = "Yell",         order = 3,
+                get = function() return Emoticons_Settings["CHAT_MSG_YELL"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_YELL", v) end },
+            guild        = { type = "toggle", name = "Guild",        order = 4,
+                get = function() return Emoticons_Settings["CHAT_MSG_GUILD"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_GUILD", v) end },
+            officer      = { type = "toggle", name = "Officer",      order = 5,
+                get = function() return Emoticons_Settings["CHAT_MSG_OFFICER"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_OFFICER", v) end },
+            whisper      = { type = "toggle", name = "Whisper",      order = 6,
+                get = function() return Emoticons_Settings["CHAT_MSG_WHISPER"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_WHISPER", v) end },
+            party        = { type = "toggle", name = "Party",        order = 7,
+                get = function() return Emoticons_Settings["CHAT_MSG_PARTY"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_PARTY", v) end },
+            raid         = { type = "toggle", name = "Raid",         order = 8,
+                get = function() return Emoticons_Settings["CHAT_MSG_RAID"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_RAID", v) end },
+            channel      = { type = "toggle", name = "Channel",      order = 9,
+                get = function() return Emoticons_Settings["CHAT_MSG_CHANNEL"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_CHANNEL", v) end },
+            battleground = { type = "toggle", name = "Battleground", order = 10,
+                get = function() return Emoticons_Settings["CHAT_MSG_BATTLEGROUND"] end,
+                set = function(_, v) Emoticons_SetType("CHAT_MSG_BATTLEGROUND", v) end },
+            mail         = { type = "toggle", name = "Mail",         order = 11,
+                get = function() return Emoticons_Settings["MAIL"] end,
+                set = function(_, v) Emoticons_Settings["MAIL"] = v end },
+            minimapHeader  = { type = "header", name = "Minimap", order = 20 },
+            minimapButton  = { type = "toggle", name = "Show Minimap Button", order = 21,
+                get = function() return Emoticons_Settings["MINIMAPBUTTON"] end,
+                set = function(_, v) Emoticons_SetMinimapButton(v) end },
+            bubblesHeader  = { type = "header", name = "Chat Bubbles", order = 25 },
+            bubbleEmotes   = { type = "toggle", name = "Show emotes in chat bubbles", order = 26,
+                get = function() return Emoticons_Settings["BUBBLEEMOTES"] end,
+                set = function(_, v) Emoticons_Settings["BUBBLEEMOTES"] = v end },
+            autocompleteHeader = { type = "header", name = "Autocomplete", order = 27 },
+            autocomplete   = { type = "toggle", name = "Enable emote autocomplete", order = 28,
+                get = function() return Emoticons_Settings["AUTOCOMPLETE"] end,
+                set = function(_, v) Emoticons_Settings["AUTOCOMPLETE"] = v end },
+            clickableHeader = { type = "header", name = "Clickable Emotes", order = 28.5 },
+            clickableEmotes = { type = "toggle", name = "Clickable / hover emotes (show name on mouseover)", order = 28.6,
+                get = function() return Emoticons_Settings["CLICKABLEEMOTES"] end,
+                set = function(_, v) Emoticons_Settings["CLICKABLEEMOTES"] = v end },
+            favHeader      = { type = "header", name = "Favourites", order = 29 },
+            openFavs       = { type = "execute", name = "Open Favourite Groups", order = 30,
+                func = function()
+                    InterfaceOptionsFrame_OpenToCategory(favBlizPanel)
+                    InterfaceOptionsFrame_OpenToCategory(favBlizPanel)
+                end },
+        },
+    }
+    return opts
+end
+
+BuildFavOptionsTable = function()
+    local opts = {
+        type = "group",
+        name = "Favourites",
+        args = {
+            enableAll = {
+                type = "execute", name = "Enable All", order = 1,
+                func = function()
+                    for n = 1, #dropdown_options do
+                        Emoticons_Settings["FAVEMOTES"][n] = true
+                    end
+                end,
+            },
+            disableAll = {
+                type = "execute", name = "Disable All", order = 2,
+                func = function()
+                    for n = 1, #dropdown_options do
+                        Emoticons_Settings["FAVEMOTES"][n] = false
+                    end
+                end,
+            },
+            spacer = { type = "header", name = "", order = 3 },
+        },
+    }
+    for n, groupData in ipairs(dropdown_options) do
+        opts.args["fav_" .. n] = {
+            type = "toggle",
+            name = groupData[1],
+            order = 10 + n,
+            get = function() return Emoticons_Settings["FAVEMOTES"][n] end,
+            set = function(_, v) Emoticons_Settings["FAVEMOTES"][n] = v end,
+        }
+    end
+    return opts
+end
+
+-- ── Chat Bubble Emoticon Processing ──────────────────────────────────────────
+
 local EmoticonBubbles = {}
 
+local function bubbleReplace(text)
+    if not Emoticons_Settings["BUBBLEEMOTES"] then return text end
+    local input = text .. " "
+    local cur = input
+    local prev
+    repeat
+        prev = cur
+        cur = Emoticons_RunReplacement(cur)
+    until cur == prev
+    if cur ~= input then
+        return cur
+    end
+    return text
+end
+
+local function processFontString(fontString)
+    local text = fontString:GetText()
+    if text and text ~= "" and text ~= fontString.lastText then
+        fontString.lastText = text
+        local newText = bubbleReplace(text)
+        if newText ~= text then
+            -- The bubble shrinks its FontString to fit the original word; a wide
+            -- emote texture (e.g. :28:112 = 112px) can be wider than that, and
+            -- WoW then renders the raw "|TInterface\...|t" markup as literal text.
+            -- Drop the width constraint before setting the text so the texture
+            -- always fits, then grow the bubble frame to match.
+            fontString:SetWidth(0)
+            fontString:SetText(newText)
+            local bubble = fontString:GetParent()
+            if bubble then
+                local sw = fontString:GetStringWidth()
+                if sw and sw > 0 then
+                    bubble:SetWidth(sw + 20)
+                end
+            end
+            fontString.lastText = fontString:GetText()
+        end
+    end
+end
+
 function EmoticonBubbles:Setup()
-    -- Get the FontString metatable
     local fs = CreateFrame("Frame"):CreateFontString()
     local mt = getmetatable(fs).__index
     local origSetText = mt.SetText
 
     mt.SetText = function(self, text, ...)
         if text and self:GetParent() and self:GetParent():GetParent() == WorldFrame then
-            local newText = text
-            local prev
-            repeat
-                prev = newText
-                newText = Emoticons_RunReplacement(newText)
-            until newText == prev
+            local newText = bubbleReplace(text)
+            if newText ~= text then
+                -- drop the width constraint so wide emote textures render rather
+                -- than falling back to literal "|TInterface\...|t" text
+                self:SetWidth(0)
+            end
             return origSetText(self, newText, ...)
         end
         return origSetText(self, text, ...)
     end
 end
 
--- Also keep a polling fallback for bubbles already visible
 function EmoticonBubbles:ProcessBubbles()
     for i = 1, WorldFrame:GetNumChildren() do
         local frame = select(i, WorldFrame:GetChildren())
         if frame and frame:IsVisible() then
-            -- Try children first
-            if frame:GetNumChildren() > 0 then
-                local fontString = frame:GetChildren()
-                if fontString and fontString:GetObjectType() == "FontString" then
-                    local text = fontString:GetText()
-                    if text and text ~= "" and text ~= fontString.lastText then
-                        local newText = text
-                        local prev
-                        repeat
-                            prev = newText
-                            newText = Emoticons_RunReplacement(newText)
-                        until newText == prev
-                        if newText ~= text then
-                            fontString:SetText(newText)
-                        end
-                        fontString.lastText = text
-                    end
+            for j = 1, frame:GetNumChildren() do
+                local child = select(j, frame:GetChildren())
+                if child and child:GetObjectType() == "FontString" then
+                    processFontString(child)
                 end
             end
-            -- Try regions as fallback
-            if frame:GetNumRegions() > 0 then
-                for j = 1, frame:GetNumRegions() do
-                    local region = select(j, frame:GetRegions())
-                    if region and region:GetObjectType() == "FontString" then
-                        local text = region:GetText()
-                        if text and text ~= "" and text ~= region.lastText then
-                            local newText = text
-                            local prev
-                            repeat
-                                prev = newText
-                                newText = Emoticons_RunReplacement(newText)
-                            until newText == prev
-                            if newText ~= text then
-                                region:SetText(newText)
-                            end
-                            region.lastText = text
-                        end
-                    end
+            for j = 1, frame:GetNumRegions() do
+                local region = select(j, frame:GetRegions())
+                if region and region:GetObjectType() == "FontString" then
+                    processFontString(region)
                 end
             end
         end
@@ -593,5 +634,70 @@ bubbleFrame:SetScript("OnEvent", function(self, event)
                 EmoticonBubbles:ProcessBubbles()
             end
         end)
+    end
+end)
+
+-- ── Clickable / hoverable emote hyperlinks ───────────────────────────────────
+-- When CLICKABLEEMOTES is enabled, Emoticons_InsertEmoticons wraps each emote
+-- texture in a |Htel:<name>|h ... |h hyperlink. These hooks show the emote name
+-- on hover, insert the emote code into chat on shift-click (the CHATLINK
+-- modifier, like item links), and harmlessly swallow a plain click (the link
+-- type is not a real item/spell link, so the default handler must not resolve it).
+
+-- Put the emote code into the active chat edit box (opening one if needed).
+local function Emoticons_InsertEmoteToChat(name)
+    if ChatEdit_InsertLink and ChatEdit_InsertLink(name) then return end
+    local eb = _G.ChatFrame1EditBox
+    if eb then
+        if ChatEdit_ActivateChat then
+            ChatEdit_ActivateChat(eb)
+        else
+            eb:Show()
+        end
+        eb:Insert(name)
+        eb:SetFocus()
+    end
+end
+
+local Emoticons_orig_SetItemRef = SetItemRef
+function SetItemRef(link, text, button, chatFrame)
+    if link and string.sub(link, 1, 4) == "tel:" then
+        -- Always swallow tel: clicks so old links can't error, but only act on
+        -- shift-click while the feature is enabled.
+        if Emoticons_Settings["CLICKABLEEMOTES"] and IsModifiedClick("CHATLINK") then
+            Emoticons_InsertEmoteToChat(string.sub(link, 5))
+        end
+        return
+    end
+    return Emoticons_orig_SetItemRef(link, text, button, chatFrame)
+end
+
+local function Emoticons_OnHyperlinkEnter(self, link)
+    if link and Emoticons_Settings["CLICKABLEEMOTES"] and string.sub(link, 1, 4) == "tel:" then
+        GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+        GameTooltip:SetText(string.sub(link, 5), 1, 0.82, 0)
+        GameTooltip:Show()
+    end
+end
+
+local function Emoticons_OnHyperlinkLeave(self, link)
+    if link and string.sub(link, 1, 4) == "tel:" then
+        GameTooltip:Hide()
+    end
+end
+
+local hyperlinkFrame = CreateFrame("Frame")
+hyperlinkFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+hyperlinkFrame:SetScript("OnEvent", function(self)
+    if self.hooked then return end
+    self.hooked = true
+    for i = 1, (NUM_CHAT_WINDOWS or 10) do
+        local cf = _G["ChatFrame" .. i]
+        if cf and cf.HookScript then
+            -- pcall: if this client build doesn't expose these script handlers,
+            -- degrade gracefully (clicks still swallowed, emotes still render).
+            pcall(cf.HookScript, cf, "OnHyperlinkEnter", Emoticons_OnHyperlinkEnter)
+            pcall(cf.HookScript, cf, "OnHyperlinkLeave", Emoticons_OnHyperlinkLeave)
+        end
     end
 end)
