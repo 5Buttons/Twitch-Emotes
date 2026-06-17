@@ -32,7 +32,6 @@ local securecall = securecall
 -- Frame pool to avoid creating new frames repeatedly
 local framePool = {}
 
--- Cache for element lookups to reduce _G calls
 local elementCache = {}
 local function GetElement(name)
     if not elementCache[name] then
@@ -43,21 +42,16 @@ end
 
 local Lib_UIDropDownMenuDelegate = CreateFrame("FRAME")
 
--- Initialize frame hierarchy only once at startup
 for i = 1, LIB_UIDROPDOWNMENU_MAXLEVELS do
     local listFrameName = "Lib_DropDownList"..i
     local f = CreateFrame("Button", listFrameName, nil, "Lib_UIDropDownListTemplate")
     f:SetID(i)
     f:SetSize(180, 10)
     f:SetFrameStrata("FULLSCREEN_DIALOG")
-    
-    -- Get font measurements once
     if i == 1 then
         local fontName, fontHeight, fontFlags = _G["Lib_DropDownList1Button1NormalText"]:GetFont()
         LIB_UIDROPDOWNMENU_DEFAULT_TEXT_HEIGHT = fontHeight
     end
-    
-    -- Create buttons for this dropdown level
     for j = 1, LIB_UIDROPDOWNMENU_MAXBUTTONS do
         local b = CreateFrame("Button", listFrameName.."Button"..j, f, "Lib_UIDropDownMenuButtonTemplate")
         b:SetID(j)
@@ -76,12 +70,10 @@ end
 
 Lib_UIDropDownMenuDelegate:SetScript("OnAttributeChanged", Lib_UIDropDownMenuDelegate_OnAttributeChanged)
 
--- Reusable info tables to prevent memory churn
 local Lib_UIDropDownMenu_ButtonInfo = {}
 local Lib_UIDropDownMenu_SecureInfo = {}
 
 function Lib_UIDropDownMenu_CreateInfo()
-    -- Reuse the same table to prevent memory churn
     if issecure() then
         securecall(wipe, Lib_UIDropDownMenu_SecureInfo)
         return Lib_UIDropDownMenu_SecureInfo
@@ -93,12 +85,9 @@ end
 -- Optimized frame creation with pooling
 function Lib_UIDropDownMenu_CreateFrames(level, index)
     local poolKey = level .. "-" .. index
-    
     if framePool[poolKey] then
         return framePool[poolKey]
     end
-    
-    -- Create new levels if needed
     while (level > LIB_UIDROPDOWNMENU_MAXLEVELS) do
         LIB_UIDROPDOWNMENU_MAXLEVELS = LIB_UIDROPDOWNMENU_MAXLEVELS + 1
         local newList = CreateFrame("Button", "Lib_DropDownList"..LIB_UIDROPDOWNMENU_MAXLEVELS, nil, "Lib_UIDropDownListTemplate")
@@ -108,8 +97,6 @@ function Lib_UIDropDownMenu_CreateFrames(level, index)
         newList:SetID(LIB_UIDROPDOWNMENU_MAXLEVELS)
         newList:SetWidth(180)
         newList:SetHeight(10)
-        
-        -- Create new buttons for this level
         for i=1, LIB_UIDROPDOWNMENU_MAXBUTTONS do
             local newButton = CreateFrame("Button", "Lib_DropDownList"..LIB_UIDROPDOWNMENU_MAXLEVELS.."Button"..i, newList, "Lib_UIDropDownMenuButtonTemplate")
             newButton:SetID(i)
@@ -123,8 +110,6 @@ function Lib_UIDropDownMenu_CreateFrames(level, index)
             newButton:SetID(LIB_UIDROPDOWNMENU_MAXBUTTONS)
         end
     end
-    
-    -- Store the frame in our pool for future reuse
     framePool[poolKey] = _G["Lib_DropDownList"..level]
     return framePool[poolKey]
 end
@@ -133,13 +118,10 @@ function Lib_UIDropDownMenuButton_OnEnter(self)
     if self:GetParent().isCounting then
         Lib_UIDropDownMenu_StopCounting(self:GetParent())
     end
-    
     if self.disabled then 
         return
     end
-    
     GetElement(self:GetName().."Highlight"):Show()
-    
     if self.hasArrow then
         local submenuFrame = GetElement("Lib_DropDownList"..(self:GetParent():GetID() + 1))
         if not submenuFrame:IsShown() or submenuFrame.parentID ~= self:GetID() then
@@ -148,7 +130,6 @@ function Lib_UIDropDownMenuButton_OnEnter(self)
     elseif self.menuList then
         Lib_ToggleDropDownMenu(self:GetParent():GetID() + 1, self.value, nil, nil, nil, nil, self.menuList, self)
     end
-    
     if self.tooltipTitle and not self.tooltipDisplayed then
         self.tooltipDisplayed = true
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -164,9 +145,7 @@ function Lib_UIDropDownMenuButton_OnLeave(self)
     if self:GetParent().showTimer and not self:GetParent().isCounting then
         Lib_UIDropDownMenu_StartCounting(self:GetParent())
     end
-    
     GetElement(self:GetName().."Highlight"):Hide()
-    
     if self.tooltipDisplayed then
         self.tooltipDisplayed = nil
         GameTooltip:Hide()
@@ -177,15 +156,12 @@ function Lib_UIDropDownMenu_OnUpdate(self, elapsed)
     if not (self.showTimer and self.isCounting) then
         return
     end
-    
     self.elapsedTime = (self.elapsedTime or 0) + elapsed
     if self.elapsedTime < 0.1 then
         return
     end
-    
     self.elapsedTime = 0
     self.showTimer = self.showTimer - 0.1
-    
     if self.showTimer < 0 then
         self:Hide()
         self.showTimer = nil
@@ -220,14 +196,14 @@ function Lib_UIDropDownMenu_InitializeHelper(frame)
     end
 
     Lib_UIDropDownMenuDelegate:SetAttribute("initmenu", frame)
-    
     local dropDownList, button
     for i = 1, LIB_UIDROPDOWNMENU_MAXLEVELS, 1 do
         dropDownList = GetElement("Lib_DropDownList"..i)
         if i >= LIB_UIDROPDOWNMENU_MENU_LEVEL or frame ~= LIB_UIDROPDOWNMENU_OPEN_MENU then
+            local prevButtons = dropDownList.numButtons or LIB_UIDROPDOWNMENU_MAXBUTTONS
             dropDownList.numButtons = 0
             dropDownList.maxWidth = 0
-            for j=1, LIB_UIDROPDOWNMENU_MAXBUTTONS, 1 do
+            for j=1, prevButtons, 1 do
                 button = GetElement("Lib_DropDownList"..i.."Button"..j)
                 button:Hide()
             end
@@ -241,7 +217,6 @@ function Lib_UIDropDownMenu_Initialize(frame, initFunction, displayMode, level, 
     frame.menuList = menuList
 
     securecall("Lib_UIDropDownMenu_InitializeHelper", frame)
-    
     if initFunction then
         frame.initialize = initFunction
         initFunction(frame, level, frame.menuList)
@@ -259,7 +234,6 @@ function Lib_UIDropDownMenu_Initialize(frame, initFunction, displayMode, level, 
         GetElement(name.."ButtonDisabledTexture"):SetTexture("")
         GetElement(name.."ButtonPushedTexture"):SetTexture("")
         GetElement(name.."ButtonHighlightTexture"):SetTexture("")
-        
         local buttonElement = GetElement(name.."Button")
         buttonElement:ClearAllPoints()
         buttonElement:SetPoint("LEFT", name.."Text", "LEFT", -9, 0)
@@ -270,28 +244,21 @@ end
 
 function Lib_UIDropDownMenu_AddButton(info, level)
     level = level or 1
-    
     local listFrame = GetElement("Lib_DropDownList"..level)
     local index = listFrame and (listFrame.numButtons + 1) or 1
-    
     Lib_UIDropDownMenuDelegate:SetAttribute("createframes-level", level)
     Lib_UIDropDownMenuDelegate:SetAttribute("createframes-index", index)
     Lib_UIDropDownMenuDelegate:SetAttribute("createframes", true)
-    
     listFrame = listFrame or GetElement("Lib_DropDownList"..level)
     local listFrameName = listFrame:GetName()
-    
     listFrame.numButtons = index
-    
     local button = GetElement(listFrameName.."Button"..index)
     local normalText = GetElement(button:GetName().."NormalText")
     local icon = GetElement(button:GetName().."Icon")
     local invisibleButton = GetElement(button:GetName().."InvisibleButton")
-    
     button:SetDisabledFontObject(GameFontDisableSmallLeft)
     invisibleButton:Hide()
     button:Enable()
-    
     if info.notClickable then
         info.disabled = 1
         button:SetDisabledFontObject(GameFontHighlightSmallLeft)
@@ -760,17 +727,13 @@ function Lib_ToggleDropDownMenu(level, value, dropDownFrame, anchorName, xOffset
     else
         uiScale = uiParentScale;
     end
-    
     listFrame:SetScale(uiScale);
     listFrame:Hide();
-    
     local point, relativePoint, relativeTo;
     local anchorFrame;
-    
     if level == 1 then
         Lib_UIDropDownMenuDelegate:SetAttribute("openmenu", dropDownFrame);
         listFrame:ClearAllPoints();
-        
         if not anchorName then
             xOffset = dropDownFrame.xOffset or xOffset;
             yOffset = dropDownFrame.yOffset or yOffset;
@@ -782,7 +745,6 @@ function Lib_ToggleDropDownMenu(level, value, dropDownFrame, anchorName, xOffset
             local cursorX, cursorY = GetCursorPosition();
             cursorX = cursorX/uiScale;
             cursorY = cursorY/uiScale;
-            
             xOffset = (xOffset or 0) + cursorX;
             yOffset = (yOffset or 0) + cursorY;
         else
@@ -792,32 +754,26 @@ function Lib_ToggleDropDownMenu(level, value, dropDownFrame, anchorName, xOffset
             relativeTo = dropDownFrame.relativeTo or anchorName;
             relativePoint = dropDownFrame.relativePoint or relativePoint;
         end
-        
         xOffset = xOffset or 8;
         yOffset = yOffset or 22;
         point = point or "TOPLEFT";
         relativePoint = relativePoint or "BOTTOMLEFT";
-        
         listFrame:SetPoint(point, relativeTo, relativePoint, xOffset, yOffset);
     else
         dropDownFrame = dropDownFrame or LIB_UIDROPDOWNMENU_OPEN_MENU;
         listFrame:ClearAllPoints();
-        
         local bname = button:GetParent():GetName();
         if bname:match("^Lib_DropDownList%d+$") then
             anchorFrame = button;
         else
             anchorFrame = button:GetParent();
         end
-        
         point = "TOPLEFT";
         relativePoint = "TOPRIGHT";
         listFrame:SetPoint(point, anchorFrame, relativePoint, 0, 0);
     end
-    
     local backdropFrame = _G[listFrameName.."Backdrop"];
     local menuBackdropFrame = _G[listFrameName.."MenuBackdrop"];
-    
     if dropDownFrame and dropDownFrame.displayMode == "MENU" then
         backdropFrame:Hide();
         menuBackdropFrame:Show();
@@ -825,43 +781,34 @@ function Lib_ToggleDropDownMenu(level, value, dropDownFrame, anchorName, xOffset
         backdropFrame:Show();
         menuBackdropFrame:Hide();
     end
-    
     dropDownFrame.menuList = menuList;
     Lib_UIDropDownMenu_Initialize(dropDownFrame, dropDownFrame.initialize, nil, level, menuList);
-    
     if listFrame.numButtons == 0 then
         return;
     end
-    
     listFrame:Show();
     local x, y = listFrame:GetCenter();
-    
     if not x or not y then
         listFrame:Hide();
         return;
     end
-    
     listFrame.onHide = dropDownFrame.onHide;
-    
     if level == 1 then
         local offLeft = listFrame:GetLeft()/uiScale;
         local offRight = (GetScreenWidth() - listFrame:GetRight())/uiScale;
         local offTop = (GetScreenHeight() - listFrame:GetTop())/uiScale;
         local offBottom = listFrame:GetBottom()/uiScale;
-        
         local xAddOffset, yAddOffset = 0, 0;
         if offLeft < 0 then
             xAddOffset = -offLeft;
         elseif offRight < 0 then
             xAddOffset = offRight;
         end
-        
         if offTop < 0 then
             yAddOffset = offTop;
         elseif offBottom < 0 then
             yAddOffset = -offBottom;
         end
-        
         listFrame:ClearAllPoints();
         listFrame:SetPoint(point, relativeTo, relativePoint, xOffset + xAddOffset, yOffset + yAddOffset);
     else
@@ -902,7 +849,6 @@ function Lib_ToggleDropDownMenu(level, value, dropDownFrame, anchorName, xOffset
         listFrame.parentID = anchorFrame:GetID();
         listFrame:SetPoint(point, anchorFrame, relativePoint, xOffset, yOffset);
     end
-    
     if autoHideDelay and tonumber(autoHideDelay) then
         listFrame.showTimer = autoHideDelay;
         listFrame.isCounting = 1;
@@ -912,7 +858,6 @@ end
 
 function Lib_CloseDropDownMenus(level)
     level = level or 1;
-    
     for i=level, LIB_UIDROPDOWNMENU_MAXLEVELS do
         _G["Lib_DropDownList"..i]:Hide();
     end
@@ -920,12 +865,10 @@ end
 
 function Lib_UIDropDownMenu_OnHide(self)
     local id = self:GetID();
-    
     if self.onHide then
         self.onHide(id+1);
         self.onHide = nil;
     end
-    
     Lib_CloseDropDownMenus(id+1);
     LIB_OPEN_DROPDOWNMENUS[id] = nil;
 end
@@ -933,20 +876,15 @@ end
 function Lib_UIDropDownMenu_SetWidth(frame, width, padding)
     local middleFrame = _G[frame:GetName().."Middle"];
     local textFrame = _G[frame:GetName().."Text"];
-    
     middleFrame:SetWidth(width);
-    
     local defaultPadding = 25;
     local totalPadding = padding or (defaultPadding * 2);
-    
     frame:SetWidth(width + totalPadding);
-    
     if padding then
         textFrame:SetWidth(width);
     else
         textFrame:SetWidth(width - defaultPadding);
     end
-    
     frame.noResize = 1;
 end
 
@@ -954,8 +892,6 @@ function Lib_UIDropDownMenu_SetButtonWidth(frame, width)
     if width == "TEXT" then
         width = _G[frame:GetName().."Text"]:GetWidth();
     end
-    
-
     _G[frame:GetName().."Button"]:SetWidth(width);
     frame.noResize = 1;
 end
@@ -972,17 +908,13 @@ function Lib_UIDropDownMenu_ClearAll(frame)
     frame.selectedID = nil;
     frame.selectedName = nil;
     frame.selectedValue = nil;
-    
     Lib_UIDropDownMenu_SetText(frame, "");
-    
     local currentLevel = LIB_UIDROPDOWNMENU_MENU_LEVEL;
-    
     for i=1, LIB_UIDROPDOWNMENU_MAXBUTTONS do
         local buttonName = "Lib_DropDownList"..currentLevel.."Button"..i;
         local button = _G[buttonName];
         local checkImage = _G[buttonName.."Check"];
         local uncheckImage = _G[buttonName.."UnCheck"];
-        
         button:UnlockHighlight();
         checkImage:Hide();
         uncheckImage:Hide();
@@ -1047,7 +979,6 @@ end
 
 function Lib_UIDropDownMenu_SetButtonText(level, id, text, colorCode)
     local button = _G["Lib_DropDownList"..level.."Button"..id];
-    
     if colorCode then
         button:SetText(colorCode..text.."|r");
     else
@@ -1058,11 +989,9 @@ end
 function Lib_UIDropDownMenu_DisableDropDown(dropDown)
     local frameName = dropDown:GetName();
     local label = _G[frameName.."Label"];
-    
     if label then
         label:SetVertexColor(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b);
     end
-    
     _G[frameName.."Text"]:SetVertexColor(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b);
     _G[frameName.."Button"]:Disable();
     dropDown.isDisabled = 1;
@@ -1071,11 +1000,9 @@ end
 function Lib_UIDropDownMenu_EnableDropDown(dropDown)
     local frameName = dropDown:GetName();
     local label = _G[frameName.."Label"];
-    
     if label then
         label:SetVertexColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b);
     end
-    
     _G[frameName.."Text"]:SetVertexColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b);
     _G[frameName.."Button"]:Enable();
     dropDown.isDisabled = nil;

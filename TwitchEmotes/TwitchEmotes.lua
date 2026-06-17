@@ -434,6 +434,44 @@ end
 local EmoticonChatFrameDropDown = CreateFrame("Frame", "EmoticonChatFrameDropDown", UIParent, "Lib_UIDropDownMenuTemplate")
 Lib_UIDropDownMenu_Initialize(EmoticonChatFrameDropDown, Emoticons_LoadChatFrameDropdown, "MENU", 1)
 
+do
+    local maxButtons = #dropdown_options
+    for _, group in ipairs(dropdown_options) do
+        if #group > maxButtons then maxButtons = #group end
+    end
+    Lib_UIDropDownMenu_CreateFrames(1, maxButtons)
+
+    local pending, seen = {}, {}
+    for _, group in ipairs(dropdown_options) do
+        for i = 2, #group do 
+            local tex = defaultpack[group[i]]
+            if tex and not seen[tex] then
+                seen[tex] = true
+                pending[#pending + 1] = (string.gsub(tex, ":%d+:%d+$", ""))
+            end
+        end
+    end
+
+    local warmer = CreateFrame("Frame")
+    local retained = {}
+    local idx = 0
+    warmer:SetScript("OnUpdate", function(self)
+        if InCombatLockdown() then return end
+        local budget = 15
+        while budget > 0 and idx < #pending do
+            idx = idx + 1
+            local t = self:CreateTexture(nil, "BACKGROUND")
+            t:SetTexture(pending[idx])
+            t:Hide()
+            retained[idx] = t
+            budget = budget - 1
+        end
+        if idx >= #pending then
+            self:SetScript("OnUpdate", nil)
+        end
+    end)
+end
+
 -- ── AceConfig options tables ──────────────────────────────────────────────────
 
 BuildOptionsTable = function()
