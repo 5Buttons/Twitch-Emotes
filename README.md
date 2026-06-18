@@ -18,7 +18,7 @@ All credit to ren9790
 <img width="770" height="534" alt="image" src="https://github.com/user-attachments/assets/151b6828-2e27-4070-94c9-9ed1f4b5f7fc" />
 
 
-## Autocomplete with : scroll with tab or shift+tab and use space or mouseclick (enter doesnt work; it caused taint issues)
+## Autocomplete: `:` opens suggestions — Tab/Shift+Tab to navigate, Space or click to confirm. Enter is not used to avoid taint issues.
 <img width="394" height="363" alt="image" src="https://github.com/user-attachments/assets/0ef3bd5a-4038-404b-b410-60555b4147f4" />
 
 ## Hover and shift + mouseclick 
