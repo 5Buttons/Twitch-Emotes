@@ -70,11 +70,14 @@ local popup = CreateFrame("Frame", "TwitchEmotesACPopup", UIParent)
 popup:SetWidth(POPUP_W)
 popup:SetFrameStrata("TOOLTIP")
 popup:SetBackdrop({
-    bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    bgFile   = "Interface\\Buttons\\WHITE8X8",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
     tile = true, tileSize = 8, edgeSize = 8,
     insets = { left = 3, right = 3, top = 3, bottom = 3 },
 })
+-- solid, near-opaque dark panel
+popup:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+popup:SetBackdropBorderColor(1, 1, 1, 1)
 popup:Hide()
 
 local btns = {}
@@ -162,13 +165,15 @@ local function showPopup(eb, results)
     setSelection(1)
 end
 
-applySelection = function()
+applySelection = function(trailingExtra)
+    trailingExtra = trailingExtra or 0
     local box = activeBox
     if box and currentResults and currentResults[selIndex] then
         local emote   = currentResults[selIndex]
         local t       = box:GetText()
-        -- replace the trailing ":query" token with the selected emote + space
-        local newText = t:sub(1, #t - #acToken) .. emote .. " "
+        local cut     = #t - trailingExtra - #acToken
+        if cut < 0 then cut = 0 end
+        local newText = t:sub(1, cut) .. emote .. " "
         suppress = true
         box:SetText(newText)
         box:SetCursorPosition(#newText)
@@ -202,25 +207,26 @@ local function onTextChanged(self)
 end
 
 local hooked = {}
+
+-- IMPORTANT (taint): NEVER touch the edit box's OnEnterPressed. Enter is
+-- what fires ChatEdit_SendText, which for slash commands like /target, /focus
 local function hookEditBox(eb)
     if not eb or hooked[eb] then return end
     hooked[eb] = true
 
-    eb:HookScript("OnTextChanged", onTextChanged)
-    eb:HookScript("OnHide",        hidePopup)
-
-    -- Enter: when the popup is open, apply the highlighted suggestion instead of
-    -- sending the message. Otherwise fall through to the original handler.
-    local origEnter = eb:GetScript("OnEnterPressed")
-    eb:SetScript("OnEnterPressed", function(self, ...)
+    -- Tab / Shift-Tab while the popup is open: cycle the highlighted suggestion
+    -- (Tab forward, Shift-Tab backward). Accepting is done with Space or the mouse.
+    -- When the popup is closed, fall through to Blizzard's name/channel completion.
+    local origTab = eb:GetScript("OnTabPressed")
+    eb:SetScript("OnTabPressed", function(self, ...)
         if popup:IsShown() then
-            applySelection()
+            setSelection(selIndex + (IsShiftKeyDown() and -1 or 1))
             return
         end
-        if origEnter then return origEnter(self, ...) end
+        if origTab then return origTab(self, ...) end
     end)
 
-    -- Escape: when the popup is open, just close it (don't close the edit box).
+    -- Escape while the popup is open: just close the popup, keep the edit box open.
     local origEsc = eb:GetScript("OnEscapePressed")
     eb:SetScript("OnEscapePressed", function(self, ...)
         if popup:IsShown() then
@@ -230,16 +236,16 @@ local function hookEditBox(eb)
         if origEsc then return origEsc(self, ...) end
     end)
 
-    -- Tab / Shift-Tab: cycle the highlighted suggestion while the popup is open;
-    -- otherwise fall through to the default (channel / name completion).
-    local origTab = eb:GetScript("OnTabPressed")
-    eb:SetScript("OnTabPressed", function(self, ...)
-        if popup:IsShown() then
-            setSelection(selIndex + (IsShiftKeyDown() and -1 or 1))
-            return
+    -- Auto-confirm: typing a space right after a ":token" accepts the highlighted
+    -- suggestion (retail-style flow without needing Enter).
+    eb:HookScript("OnChar", function(self, char)
+        if char == " " and popup:IsShown() and activeBox == self then
+            applySelection(1)
         end
-        if origTab then return origTab(self, ...) end
     end)
+
+    eb:HookScript("OnTextChanged", onTextChanged)
+    eb:HookScript("OnHide",        hidePopup)
 end
 
 -- Hook all chat edit boxes once the player enters the world
