@@ -32,6 +32,9 @@ local securecall = securecall
 -- Frame pool to avoid creating new frames repeatedly
 local framePool = {}
 
+-- Measured text widths keyed by the exact rendered string; see AddButton.
+local textWidthCache = {}
+
 local elementCache = {}
 local function GetElement(name)
     if not elementCache[name] then
@@ -281,13 +284,27 @@ function Lib_UIDropDownMenu_AddButton(info, level)
 
     local width = 0
     if info.text then
+        local text = info.text
         if info.colorCode then
-            button:SetText(info.colorCode..info.text.."|r")
-        else
-            button:SetText(info.text)
+            text = info.colorCode..info.text.."|r"
         end
-        
-        width = normalText:GetWidth() + 40
+        button:SetText(text)
+
+        -- GetWidth() right after SetText forces a synchronous text-layout pass
+        -- per button, which dominates the cost of reopening large menus whose
+        -- rows never change. Reuse measured widths per rendered string; custom
+        -- fonts bypass the cache since the same string can measure differently.
+        local textWidth
+        if not info.fontObject then
+            textWidth = textWidthCache[text]
+        end
+        if not textWidth then
+            textWidth = normalText:GetWidth()
+            if not info.fontObject then
+                textWidthCache[text] = textWidth
+            end
+        end
+        width = textWidth + 40
         if info.hasArrow or info.hasColorSwatch then
             width = width + 10
         end

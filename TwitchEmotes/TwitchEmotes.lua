@@ -97,6 +97,18 @@ Emoticons_Settings={
 	[28]=  {"Chromie", "Dedge", "CavemanBob","CcKekThas", "CcMile", "GusFring"},
 };
 
+-- Row text for the dropdown submenus ("|Ttexture|t name"), built once here so
+-- hovering a group doesn't concatenate ~40 fresh strings on every open.
+local emoteDisplayText = {}
+for _, group in ipairs(dropdown_options) do
+	for i = 2, #group do
+		local va = group[i]
+		if defaultpack[va] and not emoteDisplayText[va] then
+			emoteDisplayText[va] = "|T"..defaultpack[va].."|t "..va
+		end
+	end
+end
+
   function stripChars(str)
   local tableAccents = {}
     tableAccents["À"] = "A"
@@ -264,7 +276,7 @@ end
 		if (first) then
 		  first = false;
 		else
-		  info.text       = "|T"..defaultpack[va].."|t "..va;
+		  info.text       = emoteDisplayText[va];
 		  info.value      = va;
 		  info.func = Emoticons_Dropdown_OnClick;
 		  info.notCheckable = true;
@@ -441,34 +453,54 @@ do
     end
     Lib_UIDropDownMenu_CreateFrames(1, maxButtons)
 
-    local pending, seen = {}, {}
-    for _, group in ipairs(dropdown_options) do
-        for i = 2, #group do 
-            local tex = defaultpack[group[i]]
-            if tex and not seen[tex] then
-                seen[tex] = true
-                pending[#pending + 1] = (string.gsub(tex, ":%d+:%d+$", ""))
-            end
-        end
-    end
-
+    local pending = {}
     local warmer = CreateFrame("Frame")
     local retained = {}
     local idx = 0
-    warmer:SetScript("OnUpdate", function(self)
-        if InCombatLockdown() then return end
-        local budget = 15
-        while budget > 0 and idx < #pending do
+
+    local function warmOnUpdate(self)
+        if GetTime() < self.startAt or InCombatLockdown() then return end
+        -- Budget time, not count: each cold SetTexture is a synchronous disk
+        -- read that can take several ms, so cap the per-frame cost instead of
+        -- loading a fixed number of files.
+        local deadline = debugprofilestop() + 1.5
+        while idx < #pending and debugprofilestop() < deadline do
             idx = idx + 1
             local t = self:CreateTexture(nil, "BACKGROUND")
             t:SetTexture(pending[idx])
             t:Hide()
             retained[idx] = t
-            budget = budget - 1
         end
         if idx >= #pending then
             self:SetScript("OnUpdate", nil)
         end
+    end
+
+    -- Warming at load time competes with the login loading screen's own disk
+    -- I/O and causes visible stutter, so wait until the player is in the world
+    -- plus a grace period before touching any texture files.
+    warmer:RegisterEvent("PLAYER_ENTERING_WORLD")
+    warmer:SetScript("OnEvent", function(self)
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        -- Build the warm list here, not at file load: SavedVariables replace
+        -- Emoticons_Settings after this file runs, so only now is the user's
+        -- real FAVEMOTES visible. Non-favorited groups never appear in the
+        -- menu, so their textures need no warming; a group favorited
+        -- mid-session simply loads cold on its first hover.
+        local seen = {}
+        for k, group in ipairs(dropdown_options) do
+            if Emoticons_Settings["FAVEMOTES"][k] then
+                for i = 2, #group do
+                    local tex = defaultpack[group[i]]
+                    if tex and not seen[tex] then
+                        seen[tex] = true
+                        pending[#pending + 1] = (string.gsub(tex, ":%d+:%d+$", ""))
+                    end
+                end
+            end
+        end
+        self.startAt = GetTime() + 8
+        self:SetScript("OnUpdate", warmOnUpdate)
     end)
 end
 
